@@ -1,0 +1,7 @@
+# PostgreSQL
+# ------------------------------------------------------------------------------
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=hear_me_django_app
+POSTGRES_USER=rqBIzaRJCDOHVvYOfAeqaQJcrkyoOMcE
+POSTGRES_PASSWORD=VL8KN4hvTzORACuMm46PXx3mY8Yd6JCDWJ7dn4SCgmV8oTVKNIki69zf3CozbQSO
