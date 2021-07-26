@@ -2,7 +2,7 @@ from django.db.models.signals import post_save
 from factory import SelfAttribute, post_generation
 from faker.generator import random
 
-from hear_me_django.accounts.models import Account, Card, Transaction, ACCOUNT_TYPE, CURRENCIES, Company, AccountOwner
+from hear_me_django_app.accounts.models import Account, Card, Transaction, ACCOUNT_TYPE, CURRENCIES, Company, AccountOwner
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from moneyed import Money
@@ -52,21 +52,25 @@ class MoneyFactory(factory.Factory):
 class AccountFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Account
+        abstract = True
 
     IBAN = factory.Faker('uuid4')
     account_type = fuzzy.FuzzyChoice(ACCOUNT_TYPE_NO_CREDIT_CARD)
     balance = factory.SubFactory(MoneyFactory)
     limit = None
-    # private_account_owner = factory.List([None, factory.SubFactory(UserFactory)])
-    private_account_owner = factory.RelatedFactory(AccountOwnerFactory, factory_related_name='account')
-    corporate_account_owner = factory.RelatedFactory(CompanyFactory, factory_related_name='account')
+    # private_type = factory.Iterator([True, False])
+    # private_account_owner = factory.RelatedFactory(AccountOwnerFactory, factory_related_name='account')
+    # corporate_account_owner = factory.RelatedFactory(CompanyFactory, factory_related_name='account')
     # corporate_account_owner = factory.List([factory.SubFactory(CompanyFactory), None])
 
+@factory.django.mute_signals(post_save)
+class PrivateAccountFactory(AccountFactory):
+    private_account_owner = factory.RelatedFactory(AccountOwnerFactory, factory_related_name='account')
 
-# if self.private_account_owner:
-#     return self.private_account_owner.name
-# elif self.corporate_account_owner:
-#     return self.corporate_account_owner.name
+
+@factory.django.mute_signals(post_save)
+class CorporateAccountFactory(AccountFactory):
+    corporate_account_owner = factory.RelatedFactory(CompanyFactory, factory_related_name='account')
 
 
 class CardFactoryBase(factory.django.DjangoModelFactory):
@@ -78,11 +82,11 @@ class CardFactoryBase(factory.django.DjangoModelFactory):
 
 @factory.django.mute_signals(post_save)
 class CreditCardFactory(CardFactoryBase):
-    account = factory.SubFactory(AccountFactory, account_type=3, limit=SelfAttribute('balance'))
+    account = factory.SubFactory(PrivateAccountFactory, account_type=3, limit=SelfAttribute('balance'))
 
 @factory.django.mute_signals(post_save)
 class PaymentCardFactory(CardFactoryBase):
-    account = factory.SubFactory(AccountFactory, account_type=1, limit=None)
+    account = factory.SubFactory(PrivateAccountFactory, account_type=1, limit=None)
 
 
 
@@ -91,7 +95,8 @@ def populate_user(number=1):
 
 
 def populate_accounts(quantity=1):
-    AccountFactory.create_batch(size=quantity)
+    PrivateAccountFactory.create_batch(size=quantity)
+    CorporateAccountFactory.create_batch(size=quantity)
 
 def populate_cards(quantity=1):
     CreditCardFactory.create_batch(size=quantity)

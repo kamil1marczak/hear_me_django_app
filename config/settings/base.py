@@ -61,6 +61,7 @@ DJANGO_APPS = [
     "django.contrib.staticfiles",
     # "django.contrib.humanize", # Handy template tags
     "django.contrib.admin",
+    'django.contrib.postgres'
     "django.forms",
 ]
 THIRD_PARTY_APPS = [
@@ -73,6 +74,9 @@ THIRD_PARTY_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "djmoney",
+    'djmoney.contrib.exchange',
+    'auditlog'
+    # 'simple_history',
 ]
 
 LOCAL_APPS = [
@@ -137,6 +141,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.common.BrokenLinkEmailsMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'auditlog.middleware.AuditlogMiddleware'
+    # 'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 # STATIC
@@ -313,3 +319,7 @@ REST_FRAMEWORK = {
 CORS_URLS_REGEX = r"^/api/.*$"
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+# exchange rate api
+OPEN_EXCHANGE_RATES_APP_ID = '5d0a07241e4044bd93defad0623985b6'
+FIXER_ACCESS_KEY = '99eedf1c7e9bd44b9202692351d48976'

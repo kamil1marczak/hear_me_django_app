@@ -1,5 +1,6 @@
 from typing import Union, List
 
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.db import models
 import uuid
@@ -8,9 +9,11 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from moneyed import Money
 import datetime
+# from simple_history.models import HistoricalRecords
 
 from django.db.models.signals import post_save, pre_delete, pre_save
 from django.dispatch import receiver
+from auditlog.registry import auditlog
 
 ACCOUNT_TYPE = [
     (1, _("current")),
@@ -41,15 +44,14 @@ class Account(models.Model):
     balance = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN')
     limit = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', default=None, null=True, blank=True)
 
-
     @property
     def owner_name(self):
         try:
-            return self.private_account_owners.first().owner.name
+            return f'PERSON: {self.private_account_owners.first().owner.name}'
         except AttributeError:
             pass
         try:
-            return self.corporate_account_owner.first().name
+            return f'CORPORATE: {self.corporate_account_owner.first().name}'
         except AttributeError:
             pass
 
@@ -107,13 +109,22 @@ class Company(models.Model):
         return company
 
 
+import datetime
+import pytz
+
+utc_now = pytz.utc.localize(datetime.datetime.utcnow())
+pst_now = utc_now.astimezone(pytz.timezone("Europe/Warsaw"))
+
 class Transaction(models.Model):
     id = models.BigAutoField(primary_key=True, editable=False, auto_created=True)
-    value = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN')
+    money = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN')
+    money_receiver = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', null=True, blank=True)
+    money_sender = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', null=True, blank=True)
     account_sender_account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="transactions_sender")
     account_receiver_account = models.ForeignKey(Account, on_delete=models.CASCADE,
                                                  related_name="transactions_receiver")
-    time = models.DateTimeField(default=datetime.datetime.now)
+    # time = models.DateTimeField(default=datetime.datetime.now)
+    time = models.DateTimeField(default=timezone.now)
 
     @property
     def account_sender(self):
@@ -122,3 +133,6 @@ class Transaction(models.Model):
     @property
     def account_receiver(self):
         return self.account_receiver_account.owner_name
+
+
+auditlog.register(Account)
