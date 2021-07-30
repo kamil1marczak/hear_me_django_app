@@ -61,7 +61,7 @@ DJANGO_APPS = [
     "django.contrib.staticfiles",
     # "django.contrib.humanize", # Handy template tags
     "django.contrib.admin",
-    'django.contrib.postgres'
+    'django.contrib.postgres',
     "django.forms",
 ]
 THIRD_PARTY_APPS = [
@@ -75,7 +75,10 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "djmoney",
     'djmoney.contrib.exchange',
-    'auditlog'
+    'auditlog',
+    'django_filters',
+    # 'simple_history',
+    'drf_spectacular'
     # 'simple_history',
 ]
 
@@ -141,7 +144,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.common.BrokenLinkEmailsMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'auditlog.middleware.AuditlogMiddleware'
+    'auditlog.middleware.AuditlogMiddleware',
     # 'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
@@ -308,11 +311,22 @@ STATICFILES_FINDERS += ["compressor.finders.CompressorFinder"]
 # -------------------------------------------------------------------------------
 # django-rest-framework - https://www.django-rest-framework.org/api-guide/settings/
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Hear Me Django API',
+    'DESCRIPTION': 'Hear Me Django API',
+    'VERSION': '1.0.0',
+    # OTHER SETTINGS
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
@@ -321,5 +335,6 @@ CORS_URLS_REGEX = r"^/api/.*$"
 # ------------------------------------------------------------------------------
 
 # exchange rate api
+# AUTO_CONVERT_MONEY = True
 OPEN_EXCHANGE_RATES_APP_ID = '5d0a07241e4044bd93defad0623985b6'
 FIXER_ACCESS_KEY = '99eedf1c7e9bd44b9202692351d48976'

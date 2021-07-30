@@ -17,3 +17,12 @@
 #         error_messages = {
 #             "username": {"unique": _("This username has already been taken.")}
 #         }
+from django import forms
+
+from hear_me_django_app.accounts.models import Account, Card, Transaction, AccountOwner, Company
+
+
+class TransactionForm(forms.ModelForm):
+    class Meta:
+        model = Transaction
+        fields = ('money', 'sender_account', 'receiver_account')

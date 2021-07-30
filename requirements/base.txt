@@ -29,6 +29,9 @@ django-money==2.0.1 #https://github.com/django-money/django-money
 python-stdnum==1.16 #https://github.com/arthurdejong/python-stdnum/
 certifi==2021.5.30 #https://github.com/certifi/python-certifi
 # django-simple-history==3.0.0 #https://github.com/jazzband/django-simple-history
-auditlog3==1.0.1
+
+auditlog3==1.0.1 #required for proper finction of django-auditlog, avoid crashe due to auditlog incomply with python3
 django-auditlog==0.4.7 #https://github.com/jazzband/django-auditlog
 
+django_filter==2.4.0 #https://github.com/carltongibson/django-filter
+drf-spectacular==0.17.3 # https://github.com/tfranzel/drf-spectacular/

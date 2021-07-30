@@ -1,9 +1,12 @@
+from decimal import Decimal
 from typing import Union, List
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.db import models
 import uuid
+
+from djmoney.contrib.exchange.models import convert_money
 from djmoney.models.fields import MoneyField
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -14,6 +17,14 @@ import datetime
 from django.db.models.signals import post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from auditlog.registry import auditlog
+from auditlog.models import AuditlogHistoryField
+
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import (
+    SearchQuery, SearchRank, SearchVectorField, TrigramSimilarity, SearchVector
+)
+from django.db.models import F, Q
+from djmoney.models.validators import MaxMoneyValidator, MinMoneyValidator
 
 ACCOUNT_TYPE = [
     (1, _("current")),
@@ -38,11 +49,48 @@ CURRENCY_CHOICES = [('USD', 'USD $'), ('EUR', 'EUR €'), ('PLN', 'PLN zł')]
 CURRENCIES = ('USD', 'EUR', "PLN")
 
 
+# class AccountManager(models.Manager):
+#
+#     def get_owner(self, queryset, name, value):
+#         search_query = Q(
+#             Q(search_vector=SearchQuery(value))
+#         )
+#         return queryset.annotate(
+#             search_vector=SearchVector('private_account_owners__owner__name', 'corporate_account_owner__name', )
+#         ).filter(search_query)
+
+# def validate_poitive_balance(value):
+#     if value.amount < 0:
+#     # if value % 2 != 0:
+#         raise ValidationError(
+#             _('balance can not be negative'),
+#             params={'value': value},
+#         )
+
 class Account(models.Model):
     IBAN = models.UUIDField(primary_key=True, default=uuid.uuid1, editable=False)
     account_type = models.IntegerField(choices=ACCOUNT_TYPE, default=1)
-    balance = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN')
+    balance = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', validators=[
+        MinMoneyValidator(Money(amount=Decimal('0.01'), currency='PLN'))
+        ])
     limit = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', default=None, null=True, blank=True)
+
+    search_vector = SearchVectorField(null=True, blank=True)
+
+    # history = AuditlogHistoryField()
+
+    # history = HistoricalRecords()
+
+    # objects = AccountManager()
+
+    class Meta:  # new
+        indexes = [
+            GinIndex(fields=['search_vector'], name='search_vector_index')
+        ]
+    # def clean(self):
+    #     # Don't allow draft entries to have a pub_date.
+    #     if self.balance < 0:
+    #         raise ValidationError({'balance': _('Balance can not be negative')})
 
     @property
     def owner_name(self):
@@ -55,10 +103,8 @@ class Account(models.Model):
         except AttributeError:
             pass
 
-
     def __str__(self):
         return f"{self.get_account_type_display()} : {self.IBAN}"
-
 
 
 class AccountOwner(models.Model):
@@ -91,7 +137,6 @@ class Card(models.Model):
         return card
 
 
-
 class Company(models.Model):
     name = models.TextField(unique=True)
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="corporate_account_owner")
@@ -115,24 +160,73 @@ import pytz
 utc_now = pytz.utc.localize(datetime.datetime.utcnow())
 pst_now = utc_now.astimezone(pytz.timezone("Europe/Warsaw"))
 
+
+
+from django.utils.translation import gettext_lazy as _
+
 class Transaction(models.Model):
     id = models.BigAutoField(primary_key=True, editable=False, auto_created=True)
-    money = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN')
-    money_receiver = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', null=True, blank=True)
-    money_sender = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN', null=True, blank=True)
-    account_sender_account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="transactions_sender")
-    account_receiver_account = models.ForeignKey(Account, on_delete=models.CASCADE,
-                                                 related_name="transactions_receiver")
+    money = MoneyField(max_digits=14, decimal_places=2, default_currency='PLN',)
+    money_receiver = MoneyField(max_digits=14, decimal_places=2, default_currency=None, null=True, blank=True)
+    money_sender = MoneyField(max_digits=14, decimal_places=2, default_currency=None, null=True, blank=True)
+    sender_account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="transactions_sender")
+    receiver_account = models.ForeignKey(Account, on_delete=models.CASCADE,
+                                         related_name="transactions_receiver")
     # time = models.DateTimeField(default=datetime.datetime.now)
     time = models.DateTimeField(default=timezone.now)
 
-    @property
-    def account_sender(self):
-        return self.account_sender_account.owner_name
+    # objects = TransactionQuerySet.as_manager()
+
+    # objects = TransactionManager()
+
+    # def get_money_receiver(self):
+
+
+
+    def save(self, *args, **kwargs):
+        if self.id == None:
+            sender_curr = self.sender_account.balance_currency
+            sender_money = convert_money(self.money, sender_curr)
+
+
+            self.sender_account.balance = F('balance') - sender_money
+
+            # if self.sender_account.balance < 0:
+            #
+            #     return None
+            #
+            # else:
+            self.sender_account.save()
+
+            self.money_sender = sender_money
+
+            receiver_curr = self.receiver_account.balance_currency
+            receiver_money = convert_money(self.money, receiver_curr)
+            self.receiver_account.balance = F('balance') - receiver_money
+            self.receiver_account.save()
+
+            self.money_receiver = receiver_money
+
+            super(Transaction, self).save(*args, **kwargs)
+    #
+    #         receiver_curr = sender_account.balance_currency
+    #         receiver_money = convert_money(money, receiver_curr)
+    #
+    #         receiver_account.balance = F('balance') + receiver_money
+    #         receiver_account.save()
+    #
+    #         self.create_transaction()
+    #         super().save(*args, **kwargs)
 
     @property
-    def account_receiver(self):
-        return self.account_receiver_account.owner_name
+    def sender_name(self):
+        return self.sender_account.owner_name
+
+    @property
+    def receiver_name(self):
+        return self.receiver_account.owner_name
+
+
 
 
 auditlog.register(Account)
